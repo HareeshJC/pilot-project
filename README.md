@@ -115,15 +115,40 @@ The platform demonstrates production-ready patterns for containerized microservi
 ### Deployment Flow
 
 ```
-1. APPLICATION DEPLOYMENT (build-and-deploy.yml)
-   ├─ build-and-test
-   ├─ build-api-image → ACR
-   ├─ build-worker-image → ACR
-   ├─ deploy-api → Container Apps
-   ├─ deploy-worker → Container Apps
-   └─ post-deployment (verification)
+### Deployment Flow
 
-2. INFRASTRUCTURE DEPLOYMENT (Multi-layered)
+```text
+1. APPLICATION DEPLOYMENT (Legacy Workflow)
+
+   └─ build-and-deploy.yml
+      ├─ build-and-test
+      ├─ build-api-image → ACR
+      ├─ build-worker-image → ACR
+      ├─ deploy-api → Azure Container Apps
+      ├─ deploy-worker → Azure Container Apps
+      └─ post-deployment-verification
+
+2. APPLICATION DEPLOYMENT (Reusable Workflow Architecture)
+
+   ├─ api-build-deploy.yml
+   │  └─ reusable-containerapp-build-deploy.yml
+   │     ├─ Build API
+   │     ├─ Run API Tests
+   │     ├─ Build Docker Image
+   │     ├─ Push Image to ACR
+   │     ├─ Deploy API Container App
+   │     └─ Verify Deployment
+   │
+   └─ worker-build-deploy.yml
+      └─ reusable-containerapp-build-deploy.yml
+         ├─ Build Worker
+         ├─ Run Worker Tests
+         ├─ Build Docker Image
+         ├─ Push Image to ACR
+         ├─ Deploy Worker Container App
+         └─ Verify Deployment
+
+3. INFRASTRUCTURE DEPLOYMENT (Multi-layered)
    ├─ dv01-landing-shared.yml
    │  ├─ deploy_DV01_landingzone (template-terraform.yml)
    │  │  └─ terraform-deploy.yml (plan/apply)
