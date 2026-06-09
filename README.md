@@ -3,7 +3,7 @@
   <img width=200px height=200px src="https://i.imgur.com/6wj0hh6.jpg" alt="Project logo"></a>
 </p>
 
-<h3 align="center">Integration Pilot Project - Cloud-Native Service Platform on Azure</h3>
+<h3 align="center">Pilot Project - Cloud-Native Service Platform on Azure</h3>
 
 <div align="center">
 
