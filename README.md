@@ -144,7 +144,7 @@ The platform demonstrates production-ready patterns for containerized microservi
 ## 🏗️ Project Structure <a name = "project-structure"></a>
 
 ```
-integration-pilot-project/
+pilot-project/
 ├── 01_landing_zone/                    # Landing Zone Infrastructure (VNet, Identity)
 │   ├── config_backend.tf              # Terraform backend & provider config
 │   ├── main.tf                         # Virtual networks, subnets, identities
@@ -842,8 +842,8 @@ env:
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/Hareesh-Chilmikollad/integration-pilot-project.git
-cd integration-pilot-project
+git clone https://github.com/HareeshJC/pilot-project.git
+cd pilot-project
 ```
 
 ### 2. Set Up Local Development Environment
@@ -1278,7 +1278,7 @@ terraform force-unlock LOCK_ID
 ## ✍️ Authors <a name = "authors"></a>
 
 - **Hareesh Chilmikollad** - Platform Engineer
-- GitHub: [@Hareesh-Chilmikollad](https://github.com/Hareesh-Chilmikollad)
+- GitHub: [@HareeshJC](https://github.com/HareeshJC)
 
 ---
 
