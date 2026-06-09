@@ -1,0 +1,80 @@
+name: "DV01: Landing and Shared"
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+    paths:
+      - "!**/readme.md"
+      - "01_landing_zone/variables/DV01/**"
+      - "02_shared/variables/DV01/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "!**/readme.md"
+      - "01_landing_zone/variables/DV01/**"
+      - "02_shared/variables/DV01/**"
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  deploy_DV01_landingzone:
+    name: landingzone_DV01
+    permissions:
+      id-token: write      
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/template-terraform.yml
+    with:
+      environment: "dv"
+      environment_instance: "01"
+      component_instance: "dv01"
+      variable_file_path: "01_landing_zone/variables/DV01"
+      backend_file_directory: "01_landing_zone/variables/DV01"
+      job_prefix: "DV01_landing_zone_"
+      destroy_infra: "false"
+      working_directory: "01_landing_zone"
+      environment_name: "SUB-DV-IPAAS-SI-01"
+      pipeline_agent: "self-hosted"
+      remote_state_backend_resource_group_name: ${{ vars.REMOTE_STATE_BACKEND_RESOURCE_GROUP_NAME }}
+      remote_state_backend_storage_account_name: ${{ vars.REMOTE_STATE_BACKEND_STORAGE_ACCOUNT_NAME }}
+
+    secrets:
+      client_id: ${{ secrets.EA_AZURE_AD_CLIENT_ID }}
+      tenant_id: ${{ secrets.EA_AZURE_AD_TENANT_ID }}
+      subscription_id: ${{ secrets.AZURE_DV01_SUBSCRIPTION_ID }}
+      remote_state_subscription_id: ${{ secrets.AZURE_STATE_SUBSCRIPTION_ID }}
+
+  deploy_DV01_sharedzone:
+    name: Sharedzone_DV01
+    # needs: deploy_DV01_landingzone
+    permissions:
+      id-token: write      
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/template-terraform.yml
+    with:
+      environment: "dv"
+      environment_instance: "01"
+      component_instance: "dv01"
+      variable_file_path: "02_shared/variables/DV01"
+      backend_file_directory: "02_shared/variables/DV01"
+      job_prefix: "DV01_shared_zone_"
+      destroy_infra: "false"
+      working_directory: "02_shared"
+      environment_name: "SUB-DV-IPAAS-SI-01"
+      pipeline_agent: "self-hosted"
+      remote_state_backend_resource_group_name: ${{ vars.REMOTE_STATE_BACKEND_RESOURCE_GROUP_NAME }}
+      remote_state_backend_storage_account_name: ${{ vars.REMOTE_STATE_BACKEND_STORAGE_ACCOUNT_NAME }}
+    secrets:
+      client_id: ${{ secrets.EA_AZURE_AD_CLIENT_ID }}
+      tenant_id: ${{ secrets.EA_AZURE_AD_TENANT_ID }}
+      subscription_id: ${{ secrets.AZURE_DV01_SUBSCRIPTION_ID }}
+      remote_state_subscription_id: ${{ secrets.AZURE_STATE_SUBSCRIPTION_ID }}
+      object_id: ${{ secrets.EA_AZURE_AD_OBJECT_ID }}

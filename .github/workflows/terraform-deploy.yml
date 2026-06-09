@@ -1,0 +1,283 @@
+
+name: Enterprise Reusable Terraform Deployment
+
+on:
+  workflow_call:
+    inputs:
+      working_directory:
+        required: true
+        type: string
+      backend_file_directory:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      environment_instance:
+        required: true
+        type: string
+      component_instance:
+        required: true
+        type: string
+      location:
+        required: true
+        type: string
+      location_abbr:
+        required: true
+        type: string
+      variable_file_path:
+        required: true
+        type: string
+      environment_name:
+        required: true
+        type: string
+      pipeline_agent:
+        required: true
+        type: string
+      job_prefix:
+        type: string
+        default: producer
+      destroy_infra:
+        type: string
+        default: "false"
+      remote_state_backend_storage_account_name:
+        required: true
+        type: string
+      remote_state_backend_resource_group_name:
+        required: true
+        type: string
+      terraform_version:
+        required: false
+        type: string
+        default: "1.13.3"
+
+    secrets:
+      client_id:
+        required: true
+      subscription_id:
+        required: true
+      remote_state_subscription_id:
+        required: true
+      tenant_id:
+        required: true
+      object_id:
+        required: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ARM_TENANT_ID: ${{ secrets.tenant_id }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.subscription_id }}
+  ARM_CLIENT_ID: ${{ secrets.client_id }}
+  ARM_USE_OIDC: true
+  remote_state_subscription_id: ${{ secrets.remote_state_subscription_id }}
+  remote_state_backend_storage_account_name: ${{ vars.remote_state_backend_storage_account_name }}
+  remote_state_backend_resource_group_name: ${{ vars.remote_state_backend_resource_group_name }}
+
+concurrency:
+  group: terraform-${{ inputs.environment }}-${{ inputs.environment_instance }}
+  cancel-in-progress: false
+
+jobs:
+
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ${{ inputs.pipeline_agent }}
+
+    environment:
+      name: ${{ inputs.environment_name }}
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+        shell: bash
+
+    env:
+      ARM_TENANT_ID: ${{ secrets.tenant_id }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.subscription_id }}
+      ARM_CLIENT_ID: ${{ secrets.client_id }}
+      ARM_USE_OIDC: true
+      TF_IN_AUTOMATION: true
+      ENV_SPECIFIC_VAR_FILE: "${{ inputs.environment }}${{ inputs.environment_instance }}.tfvars"
+
+    outputs:
+      integration_planstatus: ${{ steps.plan_output.outputs.exitcode }}
+      shared_planstatus: ${{ steps.shared_plan_output.outputs.exitcode }}
+      destroy_planstatus: ${{ steps.destroy_output.outputs.exitcode }}
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform_version }}
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+
+      - name: Replace Tokens
+        uses: cschleiden/replace-tokens@v1
+        with:
+          tokenPrefix: "__#"
+          tokenSuffix: "#__"
+          files: |
+            ["**/*.tf","**/*.tfvars","**/*.backend"]
+        env:
+          object_id: "${{ secrets.object_id }}"
+          environment_abbr: "${{ inputs.environment }}"
+          environment_instance: "${{ inputs.environment_instance }}"
+          component_instance: "${{ inputs.component_instance }}"
+          location_abbreviation: "${{ inputs.location_abbr }}"
+          location: "${{ inputs.location }}"
+          job_prefix: "${{ inputs.job_prefix }}"
+          service_id: "ipaas"
+          tenant_id: "${{ secrets.tenant_id }}"
+          subscription_id: "${{ secrets.subscription_id }}"
+
+      - name: Copy Backend Variables
+        uses: canastro/copy-action@0.0.2
+        with:
+          source: ${{ inputs.backend_file_directory }}/*.tfvars
+          target: ${{ inputs.working_directory }}
+
+      - name: Copy Environment Variables
+        uses: canastro/copy-action@0.0.2
+        with:
+          source: ${{ inputs.variable_file_path }}/*.tfvars
+          target: ${{ inputs.working_directory }}
+
+      - name: Terraform Init
+        run: terraform init -backend-config="../${{ inputs.backend_file_directory }}/config.backend"
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Run TFLint
+        continue-on-error: true
+        run: |
+          tflint --init
+          tflint --recursive
+
+      - name: Terraform Plan Integration
+        id: integration_plan
+        if: (contains(inputs.variable_file_path,'pa') || contains(inputs.variable_file_path,'ca')) && inputs.destroy_infra == 'false'
+        run: |
+          terraform plan -input=false -out=out.plan -var-file="${{env.ENV_SPECIFIC_VAR_FILE}}" -detailed-exitcode
+
+      - name: Integration Plan Output
+        id: plan_output
+        if: steps.integration_plan.outcome != 'skipped'
+        run: echo "exitcode=${{ steps.integration_plan.outputs.exitcode }}" >> $GITHUB_OUTPUT
+
+      - name: Terraform Plan Shared Landing
+        id: shared_plan
+        if: steps.integration_plan.outcome == 'skipped' && inputs.destroy_infra == 'false'
+        run: |
+          terraform plan -input=false -out=out.plan -detailed-exitcode
+
+      - name: Shared Plan Output
+        id: shared_plan_output
+        if: steps.integration_plan.outcome == 'skipped' && inputs.destroy_infra == 'false'
+        run: echo "exitcode=${{ steps.shared_plan.outputs.exitcode }}" >> $GITHUB_OUTPUT
+
+      - name: Terraform Destroy Plan
+        id: destroy_plan
+        if: inputs.destroy_infra == 'true'
+        run: |
+          terraform plan -destroy -input=false -out=out.plan -detailed-exitcode
+
+      - name: Destroy Output
+        id: destroy_output
+        if: inputs.destroy_infra == 'true'
+        run: echo "exitcode=${{ steps.destroy_plan.outputs.exitcode }}" >> $GITHUB_OUTPUT
+
+      - name: Export Plan JSON
+        if: always()
+        run: terraform show -json out.plan > out.plan.json || true
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.job_prefix }}-${{ inputs.environment }}${{ inputs.environment_instance }}-tf-plan
+          path: |
+            ${{ github.workspace }}/${{ inputs.working_directory }}/out.plan
+            ${{ github.workspace }}/${{ inputs.working_directory }}/out.plan.json
+
+  terraform-apply:
+    needs: terraform-plan
+    if: (needs.terraform-plan.outputs.integration_planstatus == '2' || needs.terraform-plan.outputs.shared_planstatus == '2') && github.ref == 'refs/heads/main' && inputs.destroy_infra == 'false'
+
+    runs-on: ${{ inputs.pipeline_agent }}
+
+    environment:
+      name: ${{ inputs.environment_name }}
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform_version }}
+      - name: Replace Tokens
+        uses: cschleiden/replace-tokens@v1
+        with:
+          tokenPrefix: "__#"
+          tokenSuffix: "#__"
+          files: |
+            ["**/*.tf","**/*.tfvars","**/*.backend"]
+      - run: terraform init -backend-config="../${{ inputs.backend_file_directory }}/config.backend"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.job_prefix }}-${{ inputs.environment }}${{ inputs.environment_instance }}-tf-plan
+          path: ${{ github.workspace }}/${{ inputs.working_directory }}
+
+      - run: terraform apply -input=false -auto-approve out.plan
+
+  terraform-destroy:
+    needs: terraform-plan
+    if: needs.terraform-plan.outputs.destroy_planstatus == '2' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.destroy_infra == 'true'
+
+    runs-on: ${{ inputs.pipeline_agent }}
+
+    environment:
+      name: ${{ inputs.environment_name }}
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform_version }}
+      - name: Replace Tokens
+        uses: cschleiden/replace-tokens@v1
+        with:
+          tokenPrefix: "__#"
+          tokenSuffix: "#__"
+          files: |
+            ["**/*.tf","**/*.tfvars","**/*.backend"]
+      - run: terraform init -backend-config="../${{ inputs.backend_file_directory }}/config.backend"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.job_prefix }}-${{ inputs.environment }}${{ inputs.environment_instance }}-tf-plan
+          path: ${{ github.workspace }}/${{ inputs.working_directory }}
+
+      - run: terraform apply -input=false -auto-approve out.plan

@@ -1,0 +1,45 @@
+name: Build & Deploy API
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/api/**'
+      - 'src/Dockerfile'
+      - '.github/workflows/api-build-deploy.yml'
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/api/**'
+      - 'src/Dockerfile'
+  
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  deploy-api:
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+      pull-requests: write
+
+    uses: ./.github/workflows/reusable-containerapp-build-deploy.yml
+
+    with:
+      project_path: src/api/api.csproj
+      dockerfile_path: ./src/Dockerfile
+      image_name: api
+      container_app_name: ca-api-si-dv01
+      environment_name: SUB-DV-IPAAS-SI-01
+
+    secrets:
+      REGISTRY_LOGIN_SERVER: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}

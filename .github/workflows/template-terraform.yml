@@ -1,0 +1,85 @@
+name: Call a reusable workflow
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch: # this is to make sure it called by parent workflow
+  workflow_call:
+    inputs:
+      working_directory:
+        type: string
+        description: "terraform integration module path"
+        default: "03_integrations"
+      backend_file_directory:
+        required: true
+        type: string
+      environment:
+        type: string
+        default: "dv"
+      environment_instance:
+        type: string
+        default: "01"
+      component_instance:
+        type: string
+        default: "01"
+      location:
+        type: string
+        default: "southindia"
+      location_abbr:
+        type: string
+        default: "si"
+      variable_file_path:
+        type: string
+      environment_name:
+        type: string
+        default: "dv01_pilot_integrations"
+      job_prefix:
+        type: string
+        default: "producer"
+      pipeline_agent:
+        type: string
+        default: "self-hosted"
+      destroy_infra:
+        type: string
+        default: "false"
+      remote_state_backend_storage_account_name:
+        type: string
+      remote_state_backend_resource_group_name:
+        type: string
+    secrets:
+      client_id:
+        required: true
+      subscription_id:
+        required: true
+      tenant_id:
+        required: true
+      remote_state_subscription_id:
+        required: true
+      object_id:
+        required: false
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+
+  template:
+    name: terraform deploy
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/terraform-deploy.yml
+    with:
+      working_directory: ${{ inputs.working_directory }}
+      backend_file_directory: ${{ inputs.backend_file_directory }}
+      environment: ${{ inputs.environment }}
+      variable_file_path: ${{ inputs.variable_file_path }}
+      environment_instance: ${{ inputs.environment_instance }}
+      component_instance: ${{ inputs.component_instance }}
+      location: ${{ inputs.location }}
+      location_abbr: ${{ inputs.location_abbr }}
+      environment_name: ${{ inputs.environment_name }}
+      pipeline_agent: ${{ inputs.pipeline_agent }}
+      job_prefix: ${{ inputs.job_prefix}}
+      destroy_infra: ${{ inputs.destroy_infra }}
+      remote_state_backend_storage_account_name: ${{ inputs.remote_state_backend_storage_account_name }}
+      remote_state_backend_resource_group_name: ${{ inputs.remote_state_backend_resource_group_name }}
+    secrets: inherit

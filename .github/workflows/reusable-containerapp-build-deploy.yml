@@ -1,0 +1,150 @@
+name: Reusable Container App Build & Deploy
+
+on:
+  workflow_call:
+    inputs:
+      project_path:
+        required: true
+        type: string
+
+      dockerfile_path:
+        required: true
+        type: string
+
+      image_name:
+        required: true
+        type: string
+
+      container_app_name:
+        required: true
+        type: string
+
+      environment_name:
+        required: true
+        type: string
+
+    secrets:
+      REGISTRY_LOGIN_SERVER:
+        required: true
+
+      REGISTRY_USERNAME:
+        required: true
+
+      REGISTRY_PASSWORD:
+        required: true
+
+      AZURE_CLIENT_ID:
+        required: true
+
+      AZURE_TENANT_ID:
+        required: true
+
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+
+jobs:
+  build:
+    name: Build & Push Image
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    environment:
+      name: ${{ inputs.environment_name }}
+
+    outputs:
+      image_tag: ${{ steps.tags.outputs.tag_short }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore Dependencies
+        run: |
+          dotnet restore ${{ inputs.project_path }}
+
+      - name: Build Project
+        run: |
+          dotnet build ${{ inputs.project_path }} \
+            --configuration Release \
+            --no-restore
+
+      - name: Run Tests
+        run: |
+          dotnet test ${{ inputs.project_path }} \
+            --configuration Release \
+            --no-build
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Generate Image Tags
+        id: tags
+        run: |
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+
+          echo "tag_latest=${{ secrets.REGISTRY_LOGIN_SERVER }}/${{ inputs.image_name }}:latest" >> $GITHUB_OUTPUT
+          echo "tag_short=${{ secrets.REGISTRY_LOGIN_SERVER }}/${{ inputs.image_name }}:${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Build and Push Image
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v5
+        with:
+          context: src
+          file: ${{ inputs.dockerfile_path }}
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.tag_latest }}
+            ${{ steps.tags.outputs.tag_short }}
+
+  deploy:
+    name: Deploy Container App
+
+    runs-on: ubuntu-latest
+
+    needs:
+      - build
+
+    permissions:
+      id-token: write
+      contents: read
+
+    environment:
+      name: ${{ inputs.environment_name }}
+
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Container App
+        run: |
+          az containerapp update \
+            --name "${{ inputs.container_app_name }}" \
+            --resource-group "${{ vars.RESOURCE_GROUP }}" \
+            --image "${{ needs.build.outputs.image_tag }}"
+
+      - name: Verify Deployment
+        run: |
+          az containerapp revision list \
+            --name "${{ inputs.container_app_name }}" \
+            --resource-group "${{ vars.RESOURCE_GROUP }}" \
+            --output table

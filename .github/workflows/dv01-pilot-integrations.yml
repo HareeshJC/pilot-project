@@ -1,0 +1,127 @@
+name: "DV01: 03. pilot environment"
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+    paths:
+      - "!**/readme.md"
+      - "05_project/pilot_project/**/DV01.tfvars"
+      - "05_project/pilot_project/**/*.auto.tfvars"
+  push:
+    branches:
+      - main
+    paths:
+      - "!**/readme.md"
+      - "05_project/pilot_project/**/DV01.tfvars"
+      - "05_project/pilot_project/**/*.auto.tfvars"
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # COMMON PILOT RESOURCES
+  deploy_pilot_common_resources:
+    name: pilot-common-resources
+    permissions:
+      id-token: write      
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/template-terraform.yml
+    with:
+      environment: "dv"
+      environment_instance: "01"
+      component_instance: "dv01"
+      variable_file_path: "05_project/pilot_project/common_resources"
+      backend_file_directory: "03_integrations/variables/DV01"
+      environment_name: "SUB-DV-IPAAS-SI-01"
+      job_prefix: "common_resources_pilot_"
+      destroy_infra: "false"
+      remote_state_backend_storage_account_name: ${{ vars.REMOTE_STATE_BACKEND_STORAGE_ACCOUNT_NAME }}
+      remote_state_backend_resource_group_name: ${{ vars.REMOTE_STATE_BACKEND_RESOURCE_GROUP_NAME }}
+    secrets:
+      client_id: ${{ secrets.EA_AZURE_AD_CLIENT_ID }}
+      tenant_id: ${{ secrets.EA_AZURE_AD_TENANT_ID }}
+      subscription_id: ${{ secrets.AZURE_DV01_SUBSCRIPTION_ID }}
+      remote_state_subscription_id: ${{ secrets.AZURE_STATE_SUBSCRIPTION_ID }}
+
+  # PILOT INTERFACE RESOURCES
+  deploy_pilot_interface_pa:
+    name: pilot-interface-ingestor
+    needs: [deploy_pilot_common_resources]
+    permissions:
+      id-token: write      
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/template-terraform.yml
+    with:
+      environment: "dv"
+      environment_instance: "01"
+      component_instance: "dv01"
+      variable_file_path: "05_project/pilot_project/pilot_interface/pa"
+      backend_file_directory: "03_integrations/variables/DV01"
+      environment_name: "SUB-DV-IPAAS-SI-01"
+      job_prefix: "pilot_interface_pa"
+      destroy_infra: "false"
+      remote_state_backend_storage_account_name: ${{ vars.REMOTE_STATE_BACKEND_STORAGE_ACCOUNT_NAME }}
+      remote_state_backend_resource_group_name: ${{ vars.REMOTE_STATE_BACKEND_RESOURCE_GROUP_NAME }}
+    secrets:
+      client_id: ${{ secrets.EA_AZURE_AD_CLIENT_ID }}
+      tenant_id: ${{ secrets.EA_AZURE_AD_TENANT_ID }}
+      subscription_id: ${{ secrets.AZURE_DV01_SUBSCRIPTION_ID }}
+      remote_state_subscription_id: ${{ secrets.AZURE_STATE_SUBSCRIPTION_ID }}
+
+  deploy_pilot_interface_ca:
+    name: pilot-interface-processor
+    needs: [deploy_pilot_common_resources]
+    permissions:
+      id-token: write      
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/template-terraform.yml
+    with:
+      environment: "dv"
+      environment_instance: "01"
+      component_instance: "dv01"
+      variable_file_path: "05_project/pilot_project/pilot_interface/ca"
+      backend_file_directory: "03_integrations/variables/DV01"
+      environment_name: "SUB-DV-IPAAS-SI-01"
+      job_prefix: "pilot_interface_ca"
+      destroy_infra: "false"
+      remote_state_backend_storage_account_name: ${{ vars.REMOTE_STATE_BACKEND_STORAGE_ACCOUNT_NAME }}
+      remote_state_backend_resource_group_name: ${{ vars.REMOTE_STATE_BACKEND_RESOURCE_GROUP_NAME }}
+    secrets:
+      client_id: ${{ secrets.EA_AZURE_AD_CLIENT_ID }}
+      tenant_id: ${{ secrets.EA_AZURE_AD_TENANT_ID }}
+      subscription_id: ${{ secrets.AZURE_DV01_SUBSCRIPTION_ID }}
+      remote_state_subscription_id: ${{ secrets.AZURE_STATE_SUBSCRIPTION_ID }}
+
+
+  # SYSTEM ALERTS FOR PILOT INTERFACE
+  deploy_system_alerts:
+    name: system-alerts-pilot
+    needs: [deploy_pilot_common_resources]
+    permissions:
+      id-token: write      
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/template-terraform.yml
+    with:
+      environment: "dv"
+      environment_instance: "01"
+      component_instance: "dv01"
+      variable_file_path: "05_project/pilot_project/system_alerts/pa"
+      backend_file_directory: "03_integrations/variables/DV01"
+      environment_name: "SUB-DV-IPAAS-SI-01"
+      job_prefix: "system_alerts_"
+      destroy_infra: "false"
+      remote_state_backend_storage_account_name: ${{ vars.REMOTE_STATE_BACKEND_STORAGE_ACCOUNT_NAME }}
+      remote_state_backend_resource_group_name: ${{ vars.REMOTE_STATE_BACKEND_RESOURCE_GROUP_NAME }}
+    secrets:
+      client_id: ${{ secrets.EA_AZURE_AD_CLIENT_ID }}
+      tenant_id: ${{ secrets.EA_AZURE_AD_TENANT_ID }}
+      subscription_id: ${{ secrets.AZURE_DV01_SUBSCRIPTION_ID }}
+      remote_state_subscription_id: ${{ secrets.AZURE_STATE_SUBSCRIPTION_ID }}

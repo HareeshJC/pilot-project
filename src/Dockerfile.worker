@@ -1,0 +1,30 @@
+# Multi-stage build for Worker service
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy project files
+COPY ["worker/", "./worker/"]
+
+# Restore dependencies
+RUN dotnet restore "worker/worker.csproj"
+
+# Build application
+RUN dotnet build "worker/worker.csproj" -c Release -o /app/build
+
+# Publish
+FROM build AS publish
+RUN dotnet publish "worker/worker.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+# Runtime image
+FROM mcr.microsoft.com/dotnet/runtime:8.0 AS runtime
+WORKDIR /app
+
+# Copy published app
+COPY --from=publish /app/publish .
+
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Run worker service
+ENTRYPOINT ["dotnet", "worker.dll"]

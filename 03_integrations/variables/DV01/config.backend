@@ -1,0 +1,5 @@
+ resource_group_name   = "__#remote_state_backend_resource_group_name#__"
+ storage_account_name  = "__#remote_state_backend_storage_account_name#__"
+ container_name        = "statestorage"
+ key                   = "__#component_instance#__/__#job_prefix#__-__#component_instance#__.tfstate"
+ subscription_id       = "__#remote_state_subscription_id#__"
