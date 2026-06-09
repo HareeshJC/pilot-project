@@ -119,7 +119,6 @@ The platform demonstrates production-ready patterns for containerized microservi
 
 ```text
 1. APPLICATION DEPLOYMENT (Legacy Workflow)
-
    └─ build-and-deploy.yml
       ├─ build-and-test
       ├─ build-api-image → ACR
@@ -129,7 +128,6 @@ The platform demonstrates production-ready patterns for containerized microservi
       └─ post-deployment-verification
 
 2. APPLICATION DEPLOYMENT (Reusable Workflow Architecture)
-
    ├─ api-build-deploy.yml
    │  └─ reusable-containerapp-build-deploy.yml
    │     ├─ Build API
