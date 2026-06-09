@@ -113,11 +113,7 @@ The platform demonstrates production-ready patterns for containerized microservi
 ```
 
 ### Deployment Flow
-
 ```
-### Deployment Flow
-
-```text
 1. APPLICATION DEPLOYMENT (Legacy Workflow)
    └─ build-and-deploy.yml
       ├─ build-and-test
